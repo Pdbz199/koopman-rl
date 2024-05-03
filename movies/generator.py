@@ -16,6 +16,7 @@ class Generator:
     def generate_trajectories(self, num_trajectories, num_steps_per_trajectory=None):
         # Store trajectories in an array
         trajectories = []
+        action = [[0]]
 
         # Loop through number of trajectories
         for trajectory_num in range(num_trajectories):
@@ -45,8 +46,9 @@ class Generator:
             while check_loop_condition() is False:
                 # Append new state to trajectory
                 if self.is_double_well:
+                    #! Q: timing of state and action impact on potential
                     trajectory.append(
-                        np.concatenate((state[0], [potential]))
+                        np.concatenate((state[0], action[0], [potential]))
                     )
                 else:
                     trajectory.append(state[0])
@@ -62,7 +64,7 @@ class Generator:
                 # Update state
                 state = new_state
                 if self.is_double_well:
-                    potential = self.envs.envs[0].potential()
+                    potential = self.envs.envs[0].potential(U=action[0][0])
                 step_num += 1
 
             # Append trajectory to list of trajectories
