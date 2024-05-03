@@ -3,6 +3,7 @@ import argparse
 import gym
 import imageio.v2 as imageio
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import numpy as np
 import os
 import time
@@ -76,24 +77,24 @@ envs = gym.vector.SyncVectorEnv([make_env(args.env_id, args.seed)])
 #     envs=envs
 # )
 
-# policy = SKVI(
-#     args=args,
-#     envs=envs,
-#     saved_koopman_model_name="path_based_tensor",
-#     trained_model_start_timestamp=1712513474,
-#     chkpt_epoch_number=149,
-#     device=device,
-# )
-
-policy = SAKC(
+policy = SKVI(
     args=args,
     envs=envs,
-    is_value_based=True,
-    is_koopman=False,
-    chkpt_timestamp=1714193458,
-    chkpt_step_number=50_000,
-    device=device
+    saved_koopman_model_name="path_based_tensor",
+    trained_model_start_timestamp=1714341969,
+    chkpt_epoch_number=150,
+    device=device,
 )
+
+# policy = SAKC(
+#     args=args,
+#     envs=envs,
+#     is_value_based=True,
+#     is_koopman=False,
+#     chkpt_timestamp=1714193458,
+#     chkpt_step_number=50_000,
+#     device=device
+# )
 
 """ TRY NOT TO CHANGE ANYTHING BELOW """
 
@@ -114,10 +115,10 @@ np.save(f"{output_folder}/trajectories.npy", trajectories)
 # Plot trajectories
 fig = plt.figure()
 is_double_well = args.env_id == 'DoubleWell-v0'
-if not is_double_well:
-    ax = fig.add_subplot(111, projection='3d')
-else:
-    ax = fig.add_subplot(111)
+# if not is_double_well:
+ax = fig.add_subplot(111, projection='3d')
+# else:
+#     ax = fig.add_subplot(111)
 
 offset = 0
 if is_double_well:
@@ -128,7 +129,11 @@ for trajectory_num in range(trajectories.shape[0]):
 
     full_x = trajectories[trajectory_num, :, 0]
     full_y = trajectories[trajectory_num, :, 1]
-    full_z = trajectories[trajectory_num, :, 2]
+    if is_double_well:
+        full_u = trajectories[trajectory_num, :, 2]
+        full_z = trajectories[trajectory_num, :, 3]
+    else:
+        full_z = trajectories[trajectory_num, :, 2]
 
     if is_double_well:
         step_size = 0.1
@@ -136,12 +141,18 @@ for trajectory_num in range(trajectories.shape[0]):
             np.arange(start=env.state_minimums[0]-offset, stop=env.state_maximums[0]+offset+step_size, step=step_size),
             np.arange(start=env.state_minimums[1]-offset, stop=env.state_maximums[1]+offset+step_size, step=step_size),
         )
-        Z = env.potential(X, Y)
+        
 
     for step_num in range(trajectories.shape[1]):
         x = full_x[:(step_num+1)]
         y = full_y[:(step_num+1)]
         z = full_z[:(step_num+1)]
+        u = full_u[:(step_num+1)]
+        #print(u)
+        # Plot potential
+
+        Z = env.potential(X, Y, u[step_num])
+        
 
         # Set axis limits
         ax.set_xlim(env.state_minimums[0]-offset, env.state_maximums[0]+offset)
@@ -149,12 +160,12 @@ for trajectory_num in range(trajectories.shape[0]):
         if not is_double_well:
             ax.set_zlim(env.state_minimums[2]-offset, env.state_maximums[2]+offset)
 
-        if is_double_well:
-            ax.contour(X, Y, Z)
-            ax.plot(x, y)
-        else:
-            ax.plot3D(x, y, z)
-
+        # if is_double_well:
+        #     ax.contour(X, Y, Z)
+        #     ax.plot(x, y)
+        # else:
+        ax.plot3D(x, y, z, alpha=1.0, linewidth=2, color='black')
+        ax.plot_surface(X, Y, Z, alpha=0.7, cmap=cm.coolwarm)
         # Save frame as image
         frame_path = os.path.join(output_folder, f"frame_{step_num}.png")
         plt.savefig(frame_path)

@@ -66,11 +66,11 @@ class DoubleWell(gym.Env):
         # History of states traversed during the current episode
         self.states = []
 
-    def potential(self, X=None, Y=None):
+    def potential(self, X=None, Y=None, U=0):
         if X is not None and Y is not None:
-            return (X**2 - 1)**2 + Y**2
+            return (X**2 - 1)**2 + Y**2 + U*X + U*Y 
 
-        return (self.state[0]**2 - 1)**2 + self.state[1]**2
+        return (self.state[0]**2 - 1)**2 + self.state[1]**2 + U*self.state[0] + U*self.state[1]
 
     def reset(self, seed=None, options={}):
         # We need the following line to seed self.np_random
