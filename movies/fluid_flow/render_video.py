@@ -5,6 +5,11 @@ import scipy.io
 from custom_envs import FluidFlow
 from matplotlib.animation import FuncAnimation
 
+# Load custom colormap from MAT-file
+cc_data = loadmat('./movies/fluid_flow/data/CCcool.mat')
+cc_colormap = cc_data['CC']
+cmap = ListedColormap(cc_colormap)
+
 p = scipy.io.loadmat('./movies/fluid_flow/data/POD-COEFFS.mat')
 alpha = p['alpha'] # (17000, 8)
 p2 = scipy.io.loadmat('./movies/fluid_flow/data/POD-MODES.mat')
@@ -37,7 +42,7 @@ for k in range(0, trajectory.shape[0], trajectory.shape[0] // (fps*num_seconds))
 fig = plt.figure(figsize=(8,8))
 
 a = snapshots[0]
-im = plt.imshow(a, cmap='hot', clim=(-1,1))
+im = plt.imshow(a, cmap=cmap, clim=(-1,1))
 
 def animate_func(i):
     if i % fps == 0:

@@ -147,12 +147,24 @@ for trajectory_num in range(trajectories.shape[0]):
         x = full_x[:(step_num+1)]
         y = full_y[:(step_num+1)]
         z = full_z[:(step_num+1)]
+<<<<<<< Updated upstream
         u = full_u[:(step_num+1)]
         #print(u)
         # Plot potential
 
         Z = env.potential(X, Y, u[step_num])
         
+=======
+<<<<<<< Updated upstream
+=======
+        u = full_u[:(step_num+1)]
+        #print(u)
+        # Plot potential path and surface
+        Z_path = env.potential(x, y, u[step_num])
+        Z = env.potential(X, Y, u[step_num])
+        
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 
         # Set axis limits
         ax.set_xlim(env.state_minimums[0]-offset, env.state_maximums[0]+offset)
@@ -160,12 +172,33 @@ for trajectory_num in range(trajectories.shape[0]):
         if not is_double_well:
             ax.set_zlim(env.state_minimums[2]-offset, env.state_maximums[2]+offset)
 
+<<<<<<< Updated upstream
         # if is_double_well:
         #     ax.contour(X, Y, Z)
         #     ax.plot(x, y)
         # else:
         ax.plot3D(x, y, z, alpha=1.0, linewidth=2, color='black')
         ax.plot_surface(X, Y, Z, alpha=0.7, cmap=cm.coolwarm)
+=======
+<<<<<<< Updated upstream
+        if is_double_well:
+            ax.contour(X, Y, Z)
+            ax.plot(x, y)
+        else:
+            ax.plot3D(x, y, z)
+
+=======
+        # if is_double_well:
+        #     ax.contour(X, Y, Z)
+        #     ax.plot(x, y)
+        else:
+            #offset = -2
+            ax.set_zlim(0,15)
+        
+        ax.plot3D(x, y, Z_path, alpha=1.0, linewidth=2, color='black')
+        ax.plot_surface(X, Y, Z, alpha=0.7, cmap=cm.coolwarm)
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
         # Save frame as image
         frame_path = os.path.join(output_folder, f"frame_{step_num}.png")
         plt.savefig(frame_path)
