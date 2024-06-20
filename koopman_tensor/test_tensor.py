@@ -176,7 +176,8 @@ path_based_tensor = KoopmanTensor(
     U,
     phi=observables.monomials(args.state_order),
     psi=observables.monomials(args.action_order),
-    regressor=Regressor(args.regressor)
+    regressor=Regressor(args.regressor),
+    dt=env.dt
 )
 
 """ Predict sample points """

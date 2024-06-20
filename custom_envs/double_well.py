@@ -5,7 +5,7 @@ import torch
 from gym import spaces
 from gym.envs.registration import register
 
-dt = 0.01
+dt = 0.001 #0.01 -- original implementation
 max_episode_steps = int(20 / dt)
 # max_episode_steps = int(2 / dt)
 
