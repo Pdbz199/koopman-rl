@@ -81,11 +81,7 @@ policy = SKVI(
     args=args,
     envs=envs,
     saved_koopman_model_name="path_based_tensor",
-<<<<<<< Updated upstream
-    trained_model_start_timestamp=1714341969,
-=======
     trained_model_start_timestamp=1718893746,
->>>>>>> Stashed changes
     chkpt_epoch_number=150,
     device=device,
 )
