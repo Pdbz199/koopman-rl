@@ -16,13 +16,15 @@ class Generator:
     def generate_trajectories(self, num_trajectories, num_steps_per_trajectory=None):
         # Store trajectories in an array
         trajectories = []
-        action = [[0]]
+        costs = []
 
         # Loop through number of trajectories
         for trajectory_num in range(num_trajectories):
             # Create new trajectory and reset environment
             trajectory = []
+            costs_per_trajectory = []
             state = self.envs.reset()
+            cost = self.envs.envs[0].cost_fn(state, np.array([0]))[0,0]
             if self.is_double_well:
                 potential = self.envs.envs[0].potential()
             dones = [False]
@@ -44,18 +46,9 @@ class Generator:
 
             # Loop through trajectory until condition is met
             while check_loop_condition() is False:
-                # Append new state to trajectory
-                if self.is_double_well:
-                    #! Q: timing of state and action impact on potential
-                    trajectory.append(
-                        np.concatenate((state[0], action[0], [potential]))
-                    )
-                else:
-                    trajectory.append(state[0])
-
                 # Get action from generic policy and get new state
                 action = self.policy.get_action(state)
-                new_state, _, dones, _ = self.envs.step(action)
+                new_state, reward, dones, _ = self.envs.step(action)
 
                 # Print progress
                 if step_num % 100 == 0:
@@ -63,14 +56,26 @@ class Generator:
 
                 # Update state
                 state = new_state
+                cost = -reward[0]
                 if self.is_double_well:
-                    potential = self.envs.envs[0].potential(U=action[0][0])
+                    potential = self.envs.envs[0].potential()
                 step_num += 1
+
+                # Append new state to trajectory
+                if self.is_double_well:
+                    trajectory.append(
+                        np.concatenate((state[0], [potential]))
+                    )
+                else:
+                    trajectory.append(state[0])
+                costs_per_trajectory.append(cost)
 
             # Append trajectory to list of trajectories
             trajectories.append(trajectory)
+            costs.append(costs_per_trajectory)
 
         # Cast trajectories into numpy array
         trajectories = np.array(trajectories)
+        costs = np.array(costs)
 
-        return trajectories
+        return trajectories, costs

@@ -8,6 +8,8 @@ import numpy as np
 import os
 import time
 import torch
+from matplotlib.colors import LinearSegmentedColormap
+#from matplotlib.collections import Line3DCollection
 
 from analysis.utils import create_folder
 from custom_envs import *
@@ -32,6 +34,8 @@ parser.add_argument("--gamma", type=float, default=0.99,
         help="the discount factor gamma (default: 0.99)")
 parser.add_argument("--alpha", type=float, default=1.0,
         help="entropy regularization coefficient (default: 1.0)")
+parser.add_argument("--save-every-n-steps", type=int, default=10,
+        help="Save an image every n steps (default: 10)")
 args = parser.parse_args()
 
 # Initialize device and run name
@@ -77,24 +81,24 @@ envs = gym.vector.SyncVectorEnv([make_env(args.env_id, args.seed)])
 #     envs=envs
 # )
 
-policy = SKVI(
-    args=args,
-    envs=envs,
-    saved_koopman_model_name="path_based_tensor",
-    trained_model_start_timestamp=1718893746,
-    chkpt_epoch_number=150,
-    device=device,
-)
-
-# policy = SAKC(
+# policy = SKVI(
 #     args=args,
 #     envs=envs,
-#     is_value_based=True,
-#     is_koopman=False,
-#     chkpt_timestamp=1714193458,
-#     chkpt_step_number=50_000,
-#     device=device
+#     saved_koopman_model_name="path_based_tensor",
+#     trained_model_start_timestamp=1719070815,
+#     chkpt_epoch_number=150,
+#     device=device,
 # )
+
+policy = SAKC(
+    args=args,
+    envs=envs,
+    is_value_based=True,
+    is_koopman=True,
+    chkpt_timestamp=1719171634,
+    chkpt_step_number=50_000,
+    device=device
+)
 
 """ TRY NOT TO CHANGE ANYTHING BELOW """
 
@@ -102,7 +106,7 @@ policy = SKVI(
 generator = Generator(args, envs, policy)
 
 # Generate trajectories
-trajectories = generator.generate_trajectories(num_trajectories=1) # (num_trajectories, steps_per_trajectory, state_dim)
+trajectories, costs = generator.generate_trajectories(num_trajectories=1) # (num_trajectories, steps_per_trajectory, state_dim)
 
 # Make sure folders exist for storing video data
 curr_time = int(time.time())
@@ -141,75 +145,94 @@ for trajectory_num in range(trajectories.shape[0]):
             np.arange(start=env.state_minimums[0]-offset, stop=env.state_maximums[0]+offset+step_size, step=step_size),
             np.arange(start=env.state_minimums[1]-offset, stop=env.state_maximums[1]+offset+step_size, step=step_size),
         )
-        
 
     for step_num in range(trajectories.shape[1]):
-        x = full_x[:(step_num+1)]
-        y = full_y[:(step_num+1)]
-        z = full_z[:(step_num+1)]
-<<<<<<< Updated upstream
-        u = full_u[:(step_num+1)]
-        #print(u)
-        # Plot potential
+        if step_num == 0 or step_num % args.save_every_n_steps == 0:
+            x = full_x[:(step_num+1)]
+            y = full_y[:(step_num+1)]
+            z = full_z[:(step_num+1)]
+            u = full_u[:(step_num+1)]
+            #print(u)
+            # Plot potential
 
-        Z = env.potential(X, Y, u[step_num])
-        
-=======
-<<<<<<< Updated upstream
-=======
-        u = full_u[:(step_num+1)]
-        #print(u)
-        # Plot potential path and surface
-        Z_path = env.potential(x, y, u[step_num])
-        Z = env.potential(X, Y, u[step_num])
-        
->>>>>>> Stashed changes
->>>>>>> Stashed changes
+            Z = env.potential(X, Y, u[step_num])
+            
+            u = full_u[:(step_num+1)]
+            #print(u)
+            # Plot potential path and surface
+            Z_path = env.potential(x, y, u[step_num])
+            Z = env.potential(X, Y, u[step_num])
 
-        # Set axis limits
-        ax.set_xlim(env.state_minimums[0]-offset, env.state_maximums[0]+offset)
-        ax.set_ylim(env.state_minimums[1]-offset, env.state_maximums[1]+offset)
-        if not is_double_well:
-            ax.set_zlim(env.state_minimums[2]-offset, env.state_maximums[2]+offset)
+            # Set axis limits
+            ax.set_xlim(env.state_minimums[0]-offset, env.state_maximums[0]+offset)
+            ax.set_ylim(env.state_minimums[1]-offset, env.state_maximums[1]+offset)
+            if not is_double_well:
+                ax.set_zlim(env.state_minimums[2]-offset, env.state_maximums[2]+offset)
 
-<<<<<<< Updated upstream
-        # if is_double_well:
-        #     ax.contour(X, Y, Z)
-        #     ax.plot(x, y)
-        # else:
-        ax.plot3D(x, y, z, alpha=1.0, linewidth=2, color='black')
-        ax.plot_surface(X, Y, Z, alpha=0.7, cmap=cm.coolwarm)
-=======
-<<<<<<< Updated upstream
-        if is_double_well:
-            ax.contour(X, Y, Z)
-            ax.plot(x, y)
-        else:
-            ax.plot3D(x, y, z)
+            # if is_double_well:
+            #     ax.contour(X, Y, Z)
+            #     ax.plot(x, y)
+            # else:
+            #ax.plot3D(x, y, z, alpha=1.0, linewidth=2, color='black')
+            #ax.plot_surface(X, Y, Z, alpha=0.7, cmap=cm.coolwarm)
+            if is_double_well:
+                ax.contour(X, Y, Z)
+                #ax.plot(x, y)
+                ax.set_zlim(0,15)
+            else:
+                ax.plot3D(x, y, z)
 
-=======
-        # if is_double_well:
-        #     ax.contour(X, Y, Z)
-        #     ax.plot(x, y)
-        else:
-            #offset = -2
-            ax.set_zlim(0,15)
-        
-        ax.plot3D(x, y, Z_path, alpha=1.0, linewidth=2, color='black')
-        ax.plot_surface(X, Y, Z, alpha=0.7, cmap=cm.coolwarm)
->>>>>>> Stashed changes
->>>>>>> Stashed changes
-        # Save frame as image
-        frame_path = os.path.join(output_folder, f"frame_{step_num}.png")
-        plt.savefig(frame_path)
-        plt.cla()
+            ax.plot3D(x, y, Z_path, alpha=1.0, linewidth=2, color='black')
+            ax.plot_surface(X, Y, Z, alpha=0.7, cmap=cm.coolwarm)
+            # Save frame as image
+            frame_path = os.path.join(output_folder, f"frame_{step_num}.png")
+            plt.savefig(frame_path)
+            plt.cla()
 
-        # Append frame to list for GIF creation
-        frames.append(imageio.imread(frame_path))
+            # Append frame to list for GIF creation
+            frames.append(imageio.imread(frame_path))
 
-        # Print out progress
-        if step_num != 0 and step_num % 100 == 0:
-            print(f"Created {step_num} video frames")
+            # Print out progress
+            if step_num != 0 and step_num % 500 == 0:
+                print(f"Created {step_num} video frames")
 
     gif_path = os.path.join(output_folder, f"trajectory_{trajectory_num}.gif")
     imageio.mimsave(gif_path, frames, duration=0.1)
+
+cost_fig = plt.figure()
+cost_ax = cost_fig.add_subplot(111)
+
+for cost_num in range(costs.shape[0]):
+    cost_frames = []
+
+    for step_num in range(costs.shape[1]):
+        partial_costs = costs[cost_num, :(step_num+1)]
+
+        # Set axis limits
+        min_cost = np.min(costs[cost_num])
+        max_cost = np.max(costs[cost_num])
+        x_axis_offset = costs.shape[1]*0.1
+        y_axis_offset = max_cost*0.1
+        cost_ax.set_xlim(-x_axis_offset, costs.shape[1]+x_axis_offset)
+        cost_ax.set_ylim(min_cost-y_axis_offset, max_cost+y_axis_offset)
+
+        # Turn on grid lines
+        cost_ax.grid()
+
+        # Plot values
+        cost_ax.plot(partial_costs)
+
+        # Save trajectory frame as image
+        cost_frame_path = os.path.join(output_folder, f"cost_frame_{step_num}.png")
+        plt.savefig(cost_frame_path)
+        plt.cla()
+
+        # Append frame to list for GIF creation
+        cost_frames.append(imageio.imread(cost_frame_path))
+
+        # Print out progress
+        if step_num != 0 and step_num % 100 == 0:
+            print(f"Created {step_num} cost video frames")
+
+    cost_gif_path = os.path.join(output_folder, f"costs_{trajectory_num}.gif")
+    imageio.mimsave(cost_gif_path, cost_frames, duration=0.1)

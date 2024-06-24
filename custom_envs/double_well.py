@@ -40,8 +40,8 @@ class DoubleWell(gym.Env):
         ])
 
         # Define cost/reward
-        self.Q = np.eye(self.state_dim)
-        self.R = np.eye(self.action_dim)
+        self.Q = 10*np.eye(self.state_dim) # Increasing penalty on the state deviations
+        self.R = 0.1*np.eye(self.action_dim) # Decreasing penalty on actions to allow more aggressive control
 
         self.reference_point = np.zeros(self.state_dim)
 
