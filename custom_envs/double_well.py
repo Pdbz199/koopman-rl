@@ -4,6 +4,7 @@ import torch
 
 from gym import spaces
 from gym.envs.registration import register
+from gym.utils import seeding
 
 dt = 0.01
 max_episode_steps = int(20 / dt)
@@ -16,7 +17,10 @@ register(
 )
 
 class DoubleWell(gym.Env):
+
     def __init__(self):
+        self.np_random = None
+        self.seed()
         # Configuration with hardcoded values
         self.state_dim = 2
         self.action_dim = 1
@@ -66,6 +70,45 @@ class DoubleWell(gym.Env):
         # History of states traversed during the current episode
         self.states = []
 
+    def seed(self, seed=None):
+        self.np_random, seed = seeding.np_random(seed)
+        return [seed]
+
+    def reset(self, seed=None, options={}):
+        super().reset(seed=seed)
+        if seed is not None:
+            self.seed(seed)
+        # Use self.np_random instead of np.random
+        self.state = self.np_random.uniform(
+            low=self.state_minimums,
+            high=self.state_maximums,
+            size=(self.state_dim,)
+        )
+        self.states = [self.state]
+        self.potentials = [self.potential()]
+        self.step_count = 0
+        return self.state
+    
+    # def reset(self, seed=None, options={}):
+    #     # We need the following line to seed self.np_random
+    #     super().reset(seed=seed)
+
+    #     # Choose the initial state uniformly at random
+    #     # self.state = self.observation_space.sample()
+    #     self.state = np.random.uniform(
+    #         low=self.state_minimums,
+    #         high=self.state_maximums,
+    #         size=(self.state_dim,)
+    #     )
+    #     self.states = [self.state]
+    #     self.potentials = [self.potential()]
+
+    #     # Track number of steps taken
+    #     self.step_count = 0
+
+    #     # return self.state, {}
+    #     return self.state
+
     def potential(self, X=None, Y=None, U=0):
         # if X is not None and Y is not None:
         #     return (X**2 - 1)**2 + Y**2
@@ -76,26 +119,6 @@ class DoubleWell(gym.Env):
             return (X**2 - 1)**2 + Y**2 + U*X + U*Y
 
         return (self.state[0]**2 - 1)**2 + self.state[1]**2 + U*self.state[0] + U*self.state[1]
-
-    def reset(self, seed=None, options={}):
-        # We need the following line to seed self.np_random
-        super().reset(seed=seed)
-
-        # Choose the initial state uniformly at random
-        # self.state = self.observation_space.sample()
-        self.state = np.random.uniform(
-            low=self.state_minimums,
-            high=self.state_maximums,
-            size=(self.state_dim,)
-        )
-        self.states = [self.state]
-        self.potentials = [self.potential()]
-
-        # Track number of steps taken
-        self.step_count = 0
-
-        # return self.state, {}
-        return self.state
 
     def cost_fn(self, state, action):
         _state = state - self.reference_point
@@ -165,7 +188,6 @@ class DoubleWell(gym.Env):
             OUTPUTS:
                 State array vector pushed forward in time.
         """
-
         sigma_x = np.array([
             [0.7, state[0]],
             [0, 0.5]
@@ -178,9 +200,9 @@ class DoubleWell(gym.Env):
         #     [0, 0],
         #     [0, 0]
         # ])
-
-        drift = self.continuous_f(action)(0, state) * dt
-        diffusion = (sigma_x @ np.random.normal(loc=0, scale=1, size=(2,1)) * np.sqrt(dt))[:, 0]
+        # Use self.np_random for noise generation
+        drift = self.continuous_f(action)(0, state) * self.dt
+        diffusion = (sigma_x @ self.np_random.normal(loc=0, scale=1, size=(2,1)) * np.sqrt(self.dt))[:, 0]
         return state + (drift + diffusion)
 
     def step(self, action):
