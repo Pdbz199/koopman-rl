@@ -6,7 +6,7 @@ from gym import spaces
 from gym.envs.registration import register
 from gym.utils import seeding
 
-dt = 0.001
+dt = 0.01
 max_episode_steps = int(20 / dt)
 # max_episode_steps = int(2 / dt)
 
@@ -44,8 +44,8 @@ class DoubleWell(gym.Env):
         ])
 
         # Define cost/reward
-        self.Q = 10*np.eye(self.state_dim)
-        self.R = 0.01*np.eye(self.action_dim)
+        self.Q = np.eye(self.state_dim)
+        self.R = np.eye(self.action_dim)
 
         self.reference_point = np.zeros(self.state_dim)
 
