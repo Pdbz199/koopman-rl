@@ -34,6 +34,8 @@ parser.add_argument("--gamma", type=float, default=0.99,
         help="the discount factor gamma (default: 0.99)")
 parser.add_argument("--alpha", type=float, default=1.0,
         help="entropy regularization coefficient (default: 1.0)")
+parser.add_argument("--save-every-n-steps", type=int, default=10,
+        help="Save an image every n steps (default: 10)")
 args = parser.parse_args()
 
 # Initialize device and run name
@@ -93,7 +95,7 @@ policy = SAKC(
     envs=envs,
     is_value_based=True,
     is_koopman=True,
-    chkpt_timestamp=1719200487,
+    chkpt_timestamp=1719589866,
     chkpt_step_number=50_000,
     device=device
 )
@@ -116,12 +118,8 @@ np.save(f"{output_folder}/trajectories.npy", trajectories)
 np.save(f"{output_folder}/costs.npy", costs)
 
 # Plot trajectories
-trajectory_fig = plt.figure()
+trajectory_fig = plt.figure(figsize=(10, 8))  # Adjust figure size if needed
 is_double_well = args.env_id == 'DoubleWell-v0'
-# if not is_double_well:
-    # trajectory_ax = trajectory_fig.add_subplot(111, projection='3d')
-# else:
-    # trajectory_ax = trajectory_fig.add_subplot(111)
 trajectory_ax = trajectory_fig.add_subplot(111, projection='3d')
 
 for trajectory_num in range(trajectories.shape[0]):
@@ -143,38 +141,49 @@ for trajectory_num in range(trajectories.shape[0]):
         )
 
     for step_num in range(trajectories.shape[1]):
-        x = full_x[:(step_num+1)]
-        y = full_y[:(step_num+1)]
-        z = full_z[:(step_num+1)]
-        if is_double_well:
-            u = full_u[:(step_num+1)]
-            Z = env.potential(X, Y, u[step_num])
-            Z_path = env.potential(x, y, u[step_num])
+        if step_num == 0 or step_num % args.save_every_n_steps == 0:
+            x = full_x[:(step_num+1)]
+            y = full_y[:(step_num+1)]
+            z = full_z[:(step_num+1)]
+            if is_double_well:
+                u = full_u[:(step_num+1)]
+                Z = env.potential(X, Y, u[step_num])
+                Z_path = env.potential(x, y, u[step_num])
 
-        # Set axis limits
-        trajectory_ax.set_xlim(env.state_minimums[0], env.state_maximums[0])
-        trajectory_ax.set_ylim(env.state_minimums[1], env.state_maximums[1])
-        if not is_double_well:
-            trajectory_ax.set_zlim(env.state_minimums[2], env.state_maximums[2])
+            # Set axis limits with reduced white space
+            x_margin = (env.state_maximums[0] - env.state_minimums[0]) * 0.05
+            y_margin = (env.state_maximums[1] - env.state_minimums[1]) * 0.05
+            trajectory_ax.set_xlim(env.state_minimums[0] - x_margin, env.state_maximums[0] + x_margin)
+            trajectory_ax.set_ylim(env.state_minimums[1] - y_margin, env.state_maximums[1] + y_margin)
+            if not is_double_well:
+                z_margin = (env.state_maximums[2] - env.state_minimums[2]) * 0.05
+                trajectory_ax.set_zlim(env.state_minimums[2] - z_margin, env.state_maximums[2] + z_margin)
 
-        if is_double_well:
-            # trajectory_ax.contour(X, Y, Z)
-            # trajectory_ax.plot(x, y)
+            # Remove tick labels
+            trajectory_ax.set_xticklabels([])
+            trajectory_ax.set_yticklabels([])
+            trajectory_ax.set_zticklabels([])
 
-            trajectory_ax.contour(X, Y, Z)
-            trajectory_ax.plot3D(x, y, Z_path, alpha=1.0, linewidth=2, color='black')
-            trajectory_ax.plot_surface(X, Y, Z, alpha=0.7, cmap=cm.coolwarm)
-            trajectory_ax.set_zlim(0,15)
-        else:
-            trajectory_ax.plot3D(x, y, z)
+            if is_double_well:
+                trajectory_ax.contour(X, Y, Z)
+                trajectory_ax.plot3D(x, y, Z_path, alpha=1.0, linewidth=2, color='black')
+                trajectory_ax.plot_surface(X, Y, Z, alpha=0.7, cmap=cm.coolwarm)
+                trajectory_ax.set_zlim(0, 15)
+            else:
+                trajectory_ax.plot3D(x, y, z)
+                trajectory_ax.plot_surface(X, Y, Z, alpha=0.7, cmap=cm.coolwarm)
 
-        # Save trajectory frame as image
-        trajectory_frame_path = os.path.join(output_folder, f"trajectory_frame_{step_num}.png")
-        plt.savefig(trajectory_frame_path)
-        plt.cla()
 
-        # Append frame to list for GIF creation
-        trajectory_frames.append(imageio.imread(trajectory_frame_path))
+            # Adjust the view angle for better visibility
+            trajectory_ax.view_init(elev=20, azim=45)
+
+            # Save trajectory frame as image
+            trajectory_frame_path = os.path.join(output_folder, f"trajectory_frame_{step_num}.png")
+            plt.savefig(trajectory_frame_path, bbox_inches='tight', pad_inches=0.1)
+            plt.cla()
+
+            # Append frame to list for GIF creation
+            trajectory_frames.append(imageio.imread(trajectory_frame_path))
 
         # Print out progress
         if step_num != 0 and step_num % 100 == 0:
@@ -183,7 +192,7 @@ for trajectory_num in range(trajectories.shape[0]):
     trajectory_gif_path = os.path.join(output_folder, f"trajectory_{trajectory_num}.gif")
     imageio.mimsave(trajectory_gif_path, trajectory_frames, duration=0.1)
 
-
+# Plot costs
 cost_fig = plt.figure()
 cost_ax = cost_fig.add_subplot(111)
 
@@ -191,29 +200,30 @@ for cost_num in range(costs.shape[0]):
     cost_frames = []
 
     for step_num in range(costs.shape[1]):
-        partial_costs = costs[cost_num, :(step_num+1)]
+        if step_num == 0 or step_num % args.save_every_n_steps == 0:
+            partial_costs = costs[cost_num, :(step_num+1)]
 
-        # Set axis limits
-        min_cost = np.min(costs[cost_num])
-        max_cost = np.max(costs[cost_num])
-        x_axis_offset = costs.shape[1]*0.1
-        y_axis_offset = max_cost*0.1
-        cost_ax.set_xlim(-x_axis_offset, costs.shape[1]+x_axis_offset)
-        cost_ax.set_ylim(min_cost-y_axis_offset, max_cost+y_axis_offset)
+            # Set axis limits
+            min_cost = np.min(costs[cost_num])
+            max_cost = np.max(costs[cost_num])
+            x_axis_offset = costs.shape[1]*0.1
+            y_axis_offset = max_cost*0.1
+            cost_ax.set_xlim(-x_axis_offset, costs.shape[1]+x_axis_offset)
+            cost_ax.set_ylim(min_cost-y_axis_offset, max_cost+y_axis_offset)
 
-        # Turn on grid lines
-        cost_ax.grid()
+            # Turn on grid lines
+            cost_ax.grid()
 
-        # Plot values
-        cost_ax.plot(partial_costs)
+            # Plot values
+            cost_ax.plot(partial_costs)
 
-        # Save trajectory frame as image
-        cost_frame_path = os.path.join(output_folder, f"cost_frame_{step_num}.png")
-        plt.savefig(cost_frame_path)
-        plt.cla()
+            # Save trajectory frame as image
+            cost_frame_path = os.path.join(output_folder, f"cost_frame_{step_num}.png")
+            plt.savefig(cost_frame_path)
+            plt.cla()
 
-        # Append frame to list for GIF creation
-        cost_frames.append(imageio.imread(cost_frame_path))
+            # Append frame to list for GIF creation
+            cost_frames.append(imageio.imread(cost_frame_path))
 
         # Print out progress
         if step_num != 0 and step_num % 100 == 0:

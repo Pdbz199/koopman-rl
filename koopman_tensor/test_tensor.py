@@ -3,10 +3,12 @@
 """ Imports """
 
 import argparse
+import random
 import gym
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import os
 torch.set_default_dtype(torch.float64)
 
 from custom_envs import *
@@ -15,6 +17,7 @@ from koopman_tensor.torch_tensor import KoopmanTensor, Regressor
 from koopman_tensor.observables import torch_observables as observables
 from koopman_tensor.utils import save_tensor
 from matplotlib.animation import FuncAnimation
+
 
 """ Allow environment specification """
 
@@ -39,6 +42,27 @@ parser.add_argument('--regressor', type=str, default='ols', choices=['ols', 'sin
                     help='Which regressor to use to build the Koopman tensor (default: \'ols\')')
 args = parser.parse_args()
 
+"""Set Seed"""
+def set_seeds(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+# Set seeds
+set_seeds(args.seed)
+
+# Ensure CUDA operations are deterministic
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+
+# Create the environment
+env = gym.make(args.env_id)
+env.seed(args.seed)
+env.action_space.seed(args.seed)
+env.observation_space.seed(args.seed)
+
 """ Create the environment """
 
 if args.env_id == "DoubleWell-v0":
@@ -48,13 +72,15 @@ else:
 
 env = gym.make(args.env_id)
 
-""" Set seed """
+# """ Set seed in Environment """
 
-# TODO: Reproducibility is broken in the custom envs
-
-env.seed(args.seed)
-np.random.seed(args.seed)
-torch.random.manual_seed(args.seed)
+# # #! TODO: Reproducibility is broken in the custom envs
+# env.seed(args.seed)
+# env.action_space.seed(args.seed)
+# env.observation_space.seed(args.seed)
+# # env.seed(args.seed)
+# # np.random.seed(args.seed)
+# # torch.random.manual_seed(args.seed)
 
 """ Collect data """
 
@@ -77,17 +103,33 @@ X = torch.zeros((args.num_paths, args.num_steps_per_path, state_dim))
 Y = torch.zeros_like(X)
 U = torch.zeros((args.num_paths, args.num_steps_per_path, action_dim))
 
-for path_num in range(args.num_paths):
-    state = env.reset()
-    for step_num in range(args.num_steps_per_path):
-        X[path_num, step_num] = torch.tensor(state)
+if args.env_id == "DoubleWell-v0":
 
-        # action = np.array([0])
-        action = env.action_space.sample()
-        U[path_num, step_num] = torch.tensor(action)
+    for path_num in range(args.num_paths):
+        state = env.reset(seed=args.seed + path_num)  # Use a different seed for each path
+      
+        for step_num in range(args.num_steps_per_path):
+            X[path_num, step_num] = torch.tensor(state)
 
-        state, _, _, _ = env.step(action)
-        Y[path_num, step_num] = torch.tensor(state)
+            # action = np.array([0])
+            action = env.action_space.sample()
+            U[path_num, step_num] = torch.tensor(action)
+
+            state, _, _, _ = env.step(action)
+            Y[path_num, step_num] = torch.tensor(state)
+else:
+
+    for path_num in range(args.num_paths):
+        state = env.reset()
+        for step_num in range(args.num_steps_per_path):
+            X[path_num, step_num] = torch.tensor(state)
+
+            # action = np.array([0])
+            action = env.action_space.sample()
+            U[path_num, step_num] = torch.tensor(action)
+
+            state, _, _, _ = env.step(action)
+            Y[path_num, step_num] = torch.tensor(state)
 
 """ Make sure trajectories look ok """
 
@@ -181,6 +223,7 @@ try:
         psi=observables.monomials(args.action_order),
         regressor=Regressor(args.regressor),
         dt=env.dt,
+        seed=args.seed
     )
 except:
     # Assume the error was because there is no dt for LinearSystem
@@ -191,6 +234,7 @@ except:
         phi=observables.monomials(args.state_order),
         psi=observables.monomials(args.action_order),
         regressor=Regressor(args.regressor),
+        seed=args.seed
     )
 
 """ Predict sample points """
