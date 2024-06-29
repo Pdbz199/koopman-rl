@@ -80,3 +80,5 @@ class Generator:
         costs = np.array(costs)
 
         return trajectories, costs
+    
+    # TEST FOR GIT
