@@ -90,7 +90,7 @@ class FluidFlow(gym.Env):
             self.state = np.random.uniform(
                 low=self.state_minimums,
                 high=self.state_maximums,
-                size=(self.state_dim,)
+                size=(self.state_dim,),
             )
         else:
             self.state = state

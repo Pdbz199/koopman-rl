@@ -50,11 +50,10 @@ env = gym.make(args.env_id)
 
 """ Set seed """
 
-# TODO: Reproducibility is broken in the custom envs
-
-env.seed(args.seed)
 np.random.seed(args.seed)
-torch.random.manual_seed(args.seed)
+torch.manual_seed(args.seed)
+env.observation_space.seed(args.seed)
+env.action_space.seed(args.seed)
 
 """ Collect data """
 

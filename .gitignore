@@ -137,6 +137,7 @@ venv.bak/
 
 # Saved data files
 **/*.csv
+**/*.npy
 
 # Video stuffs
 video_frames**/
