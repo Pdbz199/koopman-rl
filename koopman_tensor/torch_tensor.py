@@ -83,8 +83,7 @@ class KoopmanTensor:
         regressor=Regressor.OLS,
         rank=8,
         is_generator=False,
-        dt=0.01,
-        seed = None
+        dt=0.01
     ):
         """
         Create an instance of the KoopmanTensor class.
@@ -117,13 +116,6 @@ class KoopmanTensor:
         KoopmanTensor
             An instance of the KoopmanTensor class.
         """
-        # Setting seed
-        # self.rng = np.random.RandomState(seed)
-        # self.torch_rng = torch.Generator()
-        # self.torch_rng.manual_seed(seed)
-        if seed is not None:
-            torch.manual_seed(seed)
-
 
         # Save datasets
         self.X = X
