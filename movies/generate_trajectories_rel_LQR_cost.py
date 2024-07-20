@@ -81,16 +81,16 @@ envs = gym.vector.SyncVectorEnv([make_env(args.env_id, args.seed)])
 #     envs=envs
 # )
 
-policy = SKVI(
-    args=args,
-    envs=envs,
-    saved_koopman_model_name="path_based_tensor",
-    trained_model_start_timestamp=1721326531,
-    chkpt_epoch_number=150,
-    device=device,
-)
+# main_policy = SKVI(
+#     args=args,
+#     envs=envs,
+#     saved_koopman_model_name="path_based_tensor",
+#     trained_model_start_timestamp=1719582901,
+#     chkpt_epoch_number=150,
+#     device=device,
+# )
 
-# policy = SAKC(
+# main_policy = SAKC(
 #     args=args,
 #     envs=envs,
 #     is_value_based=True,
@@ -99,14 +99,31 @@ policy = SKVI(
 #     chkpt_step_number=50_000,
 #     device=device
 # )
+# Create the main policy (SAKC or SKVI)
+main_policy = SKVI(
+    args=args,
+    envs=envs,
+    saved_koopman_model_name="path_based_tensor",
+    trained_model_start_timestamp=1721315915,
+    chkpt_epoch_number=150,
+    device=device,
+)
+
+# Create the LQR policy
+lqr_policy = LQR(
+    args=args,
+    envs=envs
+)
 
 """ TRY NOT TO CHANGE ANYTHING BELOW """
 
 # Create generator
-generator = Generator(args, envs, policy)
+generator = Generator(args, envs, main_policy)
+lqr_generator = Generator(args, envs, lqr_policy)
 
 # Generate trajectories
 trajectories, costs = generator.generate_trajectories(num_trajectories=1) # (num_trajectories, steps_per_trajectory, state_dim)
+_, lqr_costs = lqr_generator.generate_trajectories(num_trajectories=1)
 
 # Make sure folders exist for storing video data
 curr_time = int(time.time())
@@ -212,34 +229,44 @@ for cost_num in range(costs.shape[0]):
 
     for step_num in range(costs.shape[1]):
         if step_num % args.save_every_n_steps == 0:  # Only save every n steps
-
-            partial_costs = costs[cost_num, :(step_num+1)]
+            # Calculate cost ratio
+            main_policy_cost = costs[cost_num, :(step_num+1)]
+            lqr_policy_cost = lqr_costs[cost_num, :(step_num+1)]
+            cost_ratio = main_policy_cost / lqr_policy_cost
 
             # Set axis limits
-            min_cost = np.min(costs[cost_num])
-            max_cost = np.max(costs[cost_num])
+            min_ratio = np.min(cost_ratio)
+            max_ratio = np.max(cost_ratio)
             x_axis_offset = costs.shape[1]*0.1
-            y_axis_offset = max_cost*0.1
+            y_axis_offset = max_ratio*0.1
             cost_ax.set_xlim(-x_axis_offset, costs.shape[1]+x_axis_offset)
-            cost_ax.set_ylim(min_cost-y_axis_offset, max_cost+y_axis_offset)
+            cost_ax.set_ylim(max(0, min_ratio-y_axis_offset), max_ratio+y_axis_offset)
 
             # Turn on grid lines
             cost_ax.grid()
 
             # Plot values
-            cost_ax.plot(partial_costs)
+            cost_ax.plot(cost_ratio)
 
-            # Save trajectory frame as image
-            cost_frame_path = os.path.join(output_folder, f"cost_frame_{step_num}.png")
-            plt.savefig(cost_frame_path,bbox_inches='tight', pad_inches=0.02, dpi=300)
-            plt.cla()
+            # Add labels and title
+            cost_ax.set_xlabel('Steps')
+            cost_ax.set_ylabel('Cost Ratio (Main Policy / LQR)')
+            cost_ax.set_title('Cost Ratio: Main Policy vs LQR')
+
+            # Add a horizontal line at y=1 for reference
+            cost_ax.axhline(y=1, color='r', linestyle='--')
+
+            # Save cost ratio frame as image
+            cost_frame_path = os.path.join(output_folder, f"cost_ratio_frame_{step_num}.png")
+            plt.savefig(cost_frame_path, bbox_inches='tight', pad_inches=0.02, dpi=300)
+            cost_ax.clear()
 
             # Append frame to list for GIF creation
             cost_frames.append(imageio.imread(cost_frame_path))
 
         # Print out progress
         if step_num != 0 and step_num % 100 == 0:
-            print(f"Created {step_num} cost video frames")
+            print(f"Created {step_num} cost ratio video frames")
 
-    cost_gif_path = os.path.join(output_folder, f"costs_{trajectory_num}.gif")
-    imageio.mimsave(cost_gif_path, cost_frames, duration=0.1)
+    cost_ratio_gif_path = os.path.join(output_folder, f"cost_ratio_{cost_num}.gif")
+    imageio.mimsave(cost_ratio_gif_path, cost_frames, duration=0.1)

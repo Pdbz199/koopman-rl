@@ -154,13 +154,13 @@ U = U.reshape(total_num_datapoints, action_dim).T
 """ Construct Koopman tensor """
 
 """
-Linear System is best with
-state_order = 2
-action_order = 2
+Linear System is best with #!This is not what the ablation analysis says
+state_order = 2 #! 2
+action_order = 2 #! 4
 
-Lorenz does best with
-state_order = 3
-action_order = 1
+Lorenz does best with #!This is not what the ablation analysis says 
+state_order = 3 #!1
+action_order = 1 #! 3
 
 Fluid Flow is best with
 state_order = 4
