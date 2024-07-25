@@ -61,9 +61,10 @@ class DiscreteKoopmanValueIterationPolicy:
         DiscreteKoopmanValueIterationPolicy
             Instance of the DiscreteKoopmanValueIterationPolicy class.
         """
-
         # Store env id
         self.env_id = args.env_id
+        if self.env_id is None:
+            raise ValueError("envs must be provided to get the correct dt")
 
         # Set settings for determinism
         self.seed = args.seed
@@ -82,7 +83,8 @@ class DiscreteKoopmanValueIterationPolicy:
         self.save_data_path = f"./saved_models/{self.env_id}/skvi_chkpts_{self.start_timestamp}"
         self.use_ols = use_ols
         self.learning_rate = learning_rate
-        self.dt = dt
+        self.dt = dt #self.env_id.envs[0].dt  # Directly use the environment's dt
+        print(f"Using dt from environment: {self.dt}")  
         if self.dt is None:
             self.dt = 1.0
 

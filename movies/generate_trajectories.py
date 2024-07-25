@@ -85,7 +85,7 @@ policy = SKVI(
     args=args,
     envs=envs,
     saved_koopman_model_name="path_based_tensor",
-    trained_model_start_timestamp=1721326531,
+    trained_model_start_timestamp=1721604958,
     chkpt_epoch_number=150,
     device=device,
 )

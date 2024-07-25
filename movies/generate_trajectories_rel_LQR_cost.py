@@ -104,8 +104,8 @@ main_policy = SKVI(
     args=args,
     envs=envs,
     saved_koopman_model_name="path_based_tensor",
-    trained_model_start_timestamp=1721315915,
-    chkpt_epoch_number=150,
+    trained_model_start_timestamp=1721604958,
+    chkpt_epoch_number=5000,
     device=device,
 )
 
@@ -127,7 +127,7 @@ _, lqr_costs = lqr_generator.generate_trajectories(num_trajectories=1)
 
 # Make sure folders exist for storing video data
 curr_time = int(time.time())
-output_folder = f"video_frames/{args.env_id}_{curr_time}"
+output_folder = f"video_frames/{args.env_id}_rel_cost_{curr_time}"
 create_folder(output_folder)
 
 # Store the trajectories on hard drive
