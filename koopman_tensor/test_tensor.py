@@ -30,7 +30,7 @@ parser.add_argument('--state-order', type=int, default=2,
 parser.add_argument('--action-order', type=int, default=2,
                     help='Order of monomials to use for action dictionary (default: 2)')
 parser.add_argument('--seed', type=int, default=123,
-                    help='Seed for some level of reproducibility (default: 123)')
+                    help='Seed for reproducibility (default: 123)')
 parser.add_argument('--save-model', type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
                     help='Whether to store the Koopman tensor model in a pickle file (default: False)')
 parser.add_argument('--animate', type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
@@ -39,19 +39,15 @@ parser.add_argument('--regressor', type=str, default='ols', choices=['ols', 'sin
                     help='Which regressor to use to build the Koopman tensor (default: \'ols\')')
 args = parser.parse_args()
 
-""" Create the environment """
+""" Set seeds and create environment """
 
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
 if args.env_id == "DoubleWell-v0":
     is_3d_env = False
 else:
     is_3d_env = True
-
 env = gym.make(args.env_id)
-
-""" Set seed """
-
-np.random.seed(args.seed)
-torch.manual_seed(args.seed)
 env.observation_space.seed(args.seed)
 env.action_space.seed(args.seed)
 
@@ -203,16 +199,24 @@ estimated_x_prime = path_based_tensor.f(sample_x, sample_u)
 
 single_step_state_estimation_error_norms = np.linalg.norm(true_x_prime - estimated_x_prime, axis=0)
 avg_single_step_state_estimation_error_norm = single_step_state_estimation_error_norms.mean()
-avg_single_step_state_estimation_error_norm_per_avg_state_norm = avg_single_step_state_estimation_error_norm / np.linalg.norm(X.mean(axis=1))
+max_single_step_state_estimation_error_norm = single_step_state_estimation_error_norms.max()
+avg_state_norm = np.linalg.norm(X.mean(axis=1))
+avg_single_step_state_estimation_error_norm_per_avg_state_norm = avg_single_step_state_estimation_error_norm / avg_state_norm
+max_single_step_state_estimation_error_norm_per_avg_state_norm = max_single_step_state_estimation_error_norm / avg_state_norm
 print(f"Average single step state estimation error norm per average state norm: {avg_single_step_state_estimation_error_norm_per_avg_state_norm}")
+print(f"Max single step state estimation error norm per average state norm: {max_single_step_state_estimation_error_norm_per_avg_state_norm}")
 
 true_phi_x_prime = path_based_tensor.Phi_Y[:, sample_indices[0]:sample_indices[1]]
 estimated_phi_x_prime = path_based_tensor.phi_f(sample_x, sample_u)
 
 single_step_phi_estimation_error_norms = np.linalg.norm(true_phi_x_prime - estimated_phi_x_prime, axis=0)
 avg_single_step_phi_estimation_error_norm = single_step_phi_estimation_error_norms.mean()
-avg_single_step_phi_estimation_error_norm_per_avg_state_norm = avg_single_step_phi_estimation_error_norm / np.linalg.norm(path_based_tensor.Phi_X.mean(axis=1))
-print(f"Average single step phi estimation error norm per average phi norm: {avg_single_step_phi_estimation_error_norm_per_avg_state_norm}")
+max_single_step_phi_estimation_error_norm = single_step_phi_estimation_error_norms.max()
+avg_phi_norm = np.linalg.norm(path_based_tensor.Phi_X.mean(axis=1))
+avg_single_step_phi_estimation_error_norm_per_avg_phi_norm = avg_single_step_phi_estimation_error_norm / avg_phi_norm
+max_single_step_phi_estimation_error_norm_per_avg_phi_norm = max_single_step_phi_estimation_error_norm / avg_phi_norm
+print(f"Average single step phi estimation error norm per average phi norm: {avg_single_step_phi_estimation_error_norm_per_avg_phi_norm}")
+print(f"Max single step phi estimation error norm per average phi norm: {max_single_step_phi_estimation_error_norm_per_avg_phi_norm}")
 
 """ Save Koopman tensor """
 

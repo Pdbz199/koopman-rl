@@ -22,8 +22,8 @@ from movies.generator import Generator
 parser = argparse.ArgumentParser(description='Test Custom Environment')
 parser.add_argument('--env-id', default="FluidFlow-v0",
                     help='Gym environment (default: FluidFlow-v0)')
-parser.add_argument("--seed", type=int, default=1,
-        help="seed of the experiment (default: 1)")
+parser.add_argument("--seed", type=int, default=123,
+        help="seed of the experiment (default: 123)")
 parser.add_argument("--torch-deterministic", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
         help="if toggled, `torch.backends.cudnn.deterministic=False` (default: True)")
 parser.add_argument("--cuda", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
@@ -65,8 +65,12 @@ def make_env(env_id, seed):
 
     return thunk
 
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
 # Create gym env with ID
-env = gym.make(args.env_id)
+# env = gym.make(args.env_id)
+# env.observation_space.seed(args.seed)
+# env.action_space.seed(args.seed)
 # envs = gym.vector.SyncVectorEnv([make_env(args.env_id, args.seed, 0, False, run_name)])
 envs = gym.vector.SyncVectorEnv([make_env(args.env_id, args.seed)])
 
@@ -138,8 +142,8 @@ for trajectory_num in range(trajectories.shape[0]):
     if is_double_well:
         step_size = 0.1
         X, Y = np.meshgrid(
-            np.arange(start=env.state_minimums[0], stop=env.state_maximums[0]+step_size, step=step_size),
-            np.arange(start=env.state_minimums[1], stop=env.state_maximums[1]+step_size, step=step_size),
+            np.arange(start=envs.envs[0].state_minimums[0], stop=envs.envs[0].state_maximums[0]+step_size, step=step_size),
+            np.arange(start=envs.envs[0].state_minimums[1], stop=envs.envs[0].state_maximums[1]+step_size, step=step_size),
         )
 
     for step_num in range(trajectories.shape[1]):
@@ -148,14 +152,14 @@ for trajectory_num in range(trajectories.shape[0]):
         z = full_z[:(step_num+1)]
         if is_double_well:
             u = full_u[:(step_num+1)]
-            Z = env.potential(X, Y, u[step_num])
-            Z_path = env.potential(x, y, u[step_num])
+            Z = envs.envs[0].potential(X, Y, u[step_num])
+            Z_path = envs.envs[0].potential(x, y, u[step_num])
 
         # Set axis limits
-        trajectory_ax.set_xlim(env.state_minimums[0], env.state_maximums[0])
-        trajectory_ax.set_ylim(env.state_minimums[1], env.state_maximums[1])
+        trajectory_ax.set_xlim(envs.envs[0].state_minimums[0], envs.envs[0].state_maximums[0])
+        trajectory_ax.set_ylim(envs.envs[0].state_minimums[1], envs.envs[0].state_maximums[1])
         if not is_double_well:
-            trajectory_ax.set_zlim(env.state_minimums[2], env.state_maximums[2])
+            trajectory_ax.set_zlim(envs.envs[0].state_minimums[2], envs.envs[0].state_maximums[2])
 
         if is_double_well:
             # trajectory_ax.contour(X, Y, Z)
