@@ -103,6 +103,7 @@ def load_koopman_value_iteration_policy(
     tensor,
     all_actions,
     cost,
+    dt,
     seed,
     gamma=0.99,
     alpha=1.0,
@@ -118,6 +119,7 @@ def load_koopman_value_iteration_policy(
         dynamics_model=tensor,
         all_actions=all_actions,
         cost=cost,
+        dt=dt,
     )
     policy.load_model(
         value_function_weights=value_function_weights,
@@ -362,11 +364,16 @@ if __name__ == "__main__":
     )).T
 
     koopman_tensor = load_tensor(args.env_id, "path_based_tensor")
+    try:
+        dt = envs.envs[0].dt
+    except:
+        dt = 1.0
     koopman_value_iteration_policy = load_koopman_value_iteration_policy(
         env_id=args.env_id,
         tensor=koopman_tensor,
         all_actions=all_actions,
         cost=envs.envs[0].cost_fn,
+        dt=dt,
         seed=args.seed,
         gamma=args.gamma,
         alpha=args.alpha,

@@ -14,7 +14,12 @@ from matplotlib.animation import FuncAnimation
 parser = argparse.ArgumentParser(description='Test Custom Environment')
 parser.add_argument('--env-id', default="LinearSystem-v0",
                     help='Gym environment (default: LinearSystem-v0)')
+parser.add_argument('--seed', type=int, default=123,
+                    help='Seed for reproducibility (default: 123)')
 args = parser.parse_args()
+
+
+np.random.seed(args.seed)
 
 if args.env_id == "DoubleWell-v0":
     is_3d_env = False
@@ -22,6 +27,8 @@ else: is_3d_env = True
 
 # Create the environment
 env = gym.make(args.env_id)
+env.observation_space.seed(args.seed)
+env.action_space.seed(args.seed)
 
 # Set up the figure and axis
 fig = plt.figure()
