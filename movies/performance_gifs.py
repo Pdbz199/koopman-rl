@@ -1,5 +1,5 @@
 # Example usage:
-# python -m movies.plot_and_create_trajectory_cost_gifs --save-every-n-steps=100 --data-folder=./trajectory_cost_data/FluidFlow-v0_1723125311
+# python -m movies.performance_gifs --save-every-n-steps=100 --data-folder=./trajectory_cost_data/FluidFlow-v0_1723125311
 
 import argparse
 import numpy as np
