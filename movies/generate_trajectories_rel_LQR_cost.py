@@ -1,4 +1,5 @@
-# Example usage: python -m movies.generate_trajectories --env-id=FluidFlow-v0
+# Example usage: 
+# python -m movies.generate_trajectories_rel_LQR_cost --env-id=FluidFlow-v0
 
 # Imports
 import argparse
