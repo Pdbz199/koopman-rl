@@ -1,5 +1,5 @@
 # Example usage:
-# python -m movies.performance_gifs --save-every-n-steps=100 --data-folder=./trajectory_cost_data/FluidFlow-v0_1723125311
+# python -m movies.performance_gifs --save-every-n-steps=100 --data-folder=./trajectory_cost_data/FluidFlow-v0_1724338811
 
 import argparse
 import numpy as np
@@ -31,8 +31,9 @@ elif args.save_every_n_steps % metadata['save_every_n_steps'] != 0:
 print(f"Using save_every_n_steps = {args.save_every_n_steps}")
 
 # Load data
-trajectories = np.load(f"{args.data_folder}/trajectories.npy")
-main_costs = np.load(f"{args.data_folder}/main_costs.npy")
+karl_trajectories = np.load(f"{args.data_folder}/karl_trajectories.npy")
+karl_costs = np.load(f"{args.data_folder}/karl_costs.npy")
+zero_costs = np.load(f"{args.data_folder}/zero_costs.npy")
 lqr_costs = np.load(f"{args.data_folder}/lqr_costs.npy")
 metadata = np.load(f"{args.data_folder}/metadata.npy", allow_pickle=True).item()
 
@@ -44,12 +45,12 @@ create_folder(output_folder)
 trajectory_fig = plt.figure(figsize=(21, 14), dpi=300)
 trajectory_ax = trajectory_fig.add_subplot(111, projection='3d')
 
-for trajectory_num in range(trajectories.shape[0]):
+for trajectory_num in range(karl_trajectories.shape[0]):
     trajectory_frames = []
 
-    full_x = trajectories[trajectory_num, :, 0]
-    full_y = trajectories[trajectory_num, :, 1]
-    full_z = trajectories[trajectory_num, :, 2]
+    full_x = karl_trajectories[trajectory_num, :, 0]
+    full_y = karl_trajectories[trajectory_num, :, 1]
+    full_z = karl_trajectories[trajectory_num, :, 2]
 
     if metadata['is_double_well']:
         step_size = 0.1
@@ -58,7 +59,7 @@ for trajectory_num in range(trajectories.shape[0]):
             np.arange(start=metadata['state_minimums'][1], stop=metadata['state_maximums'][1]+step_size, step=step_size),
         )
 
-    for step_num in range(trajectories.shape[1]):
+    for step_num in range(karl_trajectories.shape[1]):
         if step_num % args.save_every_n_steps == 0 and step_num % metadata['save_every_n_steps'] == 0:
             x = full_x[:(step_num+1)]
             y = full_y[:(step_num+1)]
@@ -95,37 +96,57 @@ for trajectory_num in range(trajectories.shape[0]):
     imageio.mimsave(trajectory_gif_path, trajectory_frames, duration=0.1)
 
 # Plot costs
-cost_fig = plt.figure(figsize=(17, 11), dpi=300) 
-cost_ax = cost_fig.add_subplot(111)
+cost_fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(17, 22), dpi=300)
 
-for cost_num in range(main_costs.shape[0]):
+for cost_num in range(karl_costs.shape[0]):
     cost_frames = []
-    # Calculate the overall min and max for consistent scaling
-    all_main_costs = main_costs[cost_num, :]
-    all_lqr_costs = lqr_costs[cost_num, :]
-    all_cost_ratios = all_main_costs / all_lqr_costs
-    min_ratio = np.min(all_cost_ratios)
-    max_ratio = np.max(all_cost_ratios)
     
-    for step_num in range(main_costs.shape[1]):
+    # Calculate the overall min and max for consistent scaling
+    all_karl_costs = karl_costs[cost_num, :]
+    all_zero_costs = zero_costs[cost_num, :]
+    all_lqr_costs = lqr_costs[cost_num, :]
+    
+    all_cost_ratios_zero = all_karl_costs / all_zero_costs
+    all_cost_ratios_lqr = all_karl_costs / all_lqr_costs
+    
+    min_ratio = min(np.min(all_cost_ratios_zero), np.min(all_cost_ratios_lqr))
+    max_ratio = max(np.max(all_cost_ratios_zero), np.max(all_cost_ratios_lqr))
+    
+    for step_num in range(karl_costs.shape[1]):
         if step_num % args.save_every_n_steps == 0 and step_num % metadata['save_every_n_steps'] == 0:
-            main_policy_cost = main_costs[cost_num, :(step_num+1)]
+            karl_policy_cost = karl_costs[cost_num, :(step_num+1)]
+            zero_policy_cost = zero_costs[cost_num, :(step_num+1)]
             lqr_policy_cost = lqr_costs[cost_num, :(step_num+1)]
-            cost_ratio = main_policy_cost / lqr_policy_cost
+            
+            cost_ratio_zero = karl_policy_cost / zero_policy_cost
+            cost_ratio_lqr = karl_policy_cost / lqr_policy_cost
 
-            cost_ax.clear()
-            cost_ax.grid()
-            cost_ax.plot(cost_ratio)
+            ax1.clear()
+            ax2.clear()
+            
+            ax1.grid()
+            ax2.grid()
+            
+            ax1.plot(cost_ratio_zero, label=f'{metadata["karl_algo"]} / Zero Policy')
+            ax2.plot(cost_ratio_lqr, label=f'{metadata["karl_algo"]} / LQR')
 
             # Use fixed scales
-            cost_ax.set_xlim(0, main_costs.shape[1])
-            cost_ax.set_ylim(max(0, min_ratio * 0.9), max_ratio * 1.1)
+            ax1.set_xlim(0, karl_costs.shape[1])
+            ax2.set_xlim(0, karl_costs.shape[1])
+            ax1.set_ylim(max(0, min_ratio * 0.9), min(max_ratio * 1.1, 200))
+            ax2.set_ylim(max(0, min_ratio * 0.9), min(max_ratio * 1.1, 200))
 
-            cost_ax.set_xlabel('Steps')
-            cost_ax.set_ylabel('Cost Ratio (Main Policy / LQR)')
-            cost_ax.set_title('Cost Ratio: Main Policy vs LQR')
+            ax1.set_xlabel('Steps')
+            ax2.set_xlabel('Steps')
+            ax1.set_ylabel('Cost Ratio')
+            ax2.set_ylabel('Cost Ratio')
+            ax1.set_title(f'Cost Ratio: {metadata["karl_algo"]} vs Zero Policy')
+            ax2.set_title(f'Cost Ratio: {metadata["karl_algo"]} vs LQR')
 
-            cost_ax.axhline(y=1, color='r', linestyle='--')
+            ax1.axhline(y=1, color='r', linestyle='--', label='Equal Cost')
+            ax2.axhline(y=1, color='r', linestyle='--', label='Equal Cost')
+            ax1.legend()
+            ax2.legend()
 
             plt.tight_layout()
             
@@ -142,7 +163,5 @@ for cost_num in range(main_costs.shape[0]):
 
 plt.close(cost_fig)
 plt.close(trajectory_fig)
-
-
 
 print(f"Plots and GIFs saved in {output_folder}")

@@ -65,6 +65,20 @@ class DoubleWell(gym.Env):
 
         # History of states traversed during the current episode
         self.states = []
+        self.np_random = None
+    
+    def seed(self, seed=None):
+        """
+        Seed the random number generator for reproducibility.
+        
+        Args:
+            seed (int, optional): The seed for the random number generator.
+        
+        Returns:
+            list: A list containing the seed used.
+        """
+        self.np_random, seed = gym.utils.seeding.np_random(seed)
+        return [seed]
 
     def potential(self, X=None, Y=None, U=0):
         # if X is not None and Y is not None:
@@ -78,6 +92,16 @@ class DoubleWell(gym.Env):
         return (self.state[0]**2 - 1)**2 + self.state[1]**2 + U*self.state[0] + U*self.state[1]
 
     def reset(self, seed=None, options={}):
+        """
+        Reset the environment to an initial state
+
+        Args:
+            seed (int, optional): The seed for the random number generator.
+            options (dict, optional): A dictionary containing the initial state
+        
+        Returns:
+            numpy.ndarray: The initial state of the environment.
+        """
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
 
@@ -97,12 +121,23 @@ class DoubleWell(gym.Env):
         # return self.state, {}
         return self.state
 
+    # def cost_fn(self, state, action):
+    #     _state = state - self.reference_point
+
+    #     cost = _state @ self.Q @ _state.T + action @ self.R @ action.T
+
+    #     return cost
     def cost_fn(self, state, action):
         _state = state - self.reference_point
-
+        
+        # Ensure _state and action are 2D arrays
+        _state = np.atleast_2d(_state)
+        action = np.atleast_2d(action)
+        
+        # Transpose _state and action for correct matrix multiplication
         cost = _state @ self.Q @ _state.T + action @ self.R @ action.T
-
-        return cost
+    
+        return cost.item()  # Return a scalar value
 
     def reward_fn(self, state, action):
         return -self.cost_fn(state, action)
@@ -116,87 +151,154 @@ class DoubleWell(gym.Env):
     def vectorized_reward_fn(self, states, actions):
         return -self.vectorized_cost_fn(states, actions)
 
-    def continuous_f(self, action=None):
-        """
-            True, continuous dynamics of the system.
+    # def continuous_f(self, action=None):
+    #     """
+    #         True, continuous dynamics of the system.
 
-            INPUTS:
-                action - Action vector. If left as None, then random policy is used.
-        """
+    #         INPUTS:
+    #             action - Action vector. If left as None, then random policy is used.
+    #     """
 
-        def f_u(t, input):
-            """
-                INPUTS:
-                    t - Timestep.
-                    input - State vector.
-            """
+    #     def f_u(t, input):
+    #         """
+    #             INPUTS:
+    #                 t - Timestep.
+    #                 input - State vector.
+    #         """
 
-            x, y = input
+    #         x, y = input
             
-            u = action
-            if u is None:
-                u = np.zeros(self.action_dim)
+    #         u = action
+    #         if u is None:
+    #             u = np.zeros(self.action_dim)
 
-            b_x = np.array([
-                [4*x - 4*(x**3)],
-                [-2*y]
-            ])
-            # sigma_x = np.array([
-            #     [0.7, x],
-            #     [0, 0.5]
-            # ])
+    #         b_x = np.array([
+    #             [4*x - 4*(x**3)],
+    #             [-2*y]
+    #         ])
+    #         # sigma_x = np.array([
+    #         #     [0.7, x],
+    #         #     [0, 0.5]
+    #         # ])
 
-            column_output = b_x + u[0] #+ sigma_x @ np.random.normal(loc=0, scale=1, size=(2,1))
-            x_dot = column_output[0,0]
-            y_dot = column_output[1,0]
+    #         column_output = b_x + u[0] #+ sigma_x @ np.random.normal(loc=0, scale=1, size=(2,1))
+    #         x_dot = column_output[0,0]
+    #         y_dot = column_output[1,0]
 
-            return np.array([ x_dot, y_dot ])
+    #         return np.array([ x_dot, y_dot ])
 
-        return f_u
+    #     return f_u
+
+    # def f(self, state, action):
+    #     """
+    #         True, discretized dynamics of the system. Pushes forward from (t) to (t + dt) using a constant action.
+    
+    #         INPUTS:
+    #             state - State array.
+    #             action - Action array.
+
+    #         OUTPUTS:
+    #             State array vector pushed forward in time.
+    #     """
+
+    #     sigma_x = np.array([
+    #         [0.7, state[0]],
+    #         [0, 0.5]
+    #     ])
+    #     # sigma_x = np.array([
+    #     #     [0.7, 0],
+    #     #     [0, 0.5]
+    #     # ])
+    #     # sigma_x = np.array([
+    #     #     [0, 0],
+    #     #     [0, 0]
+    #     # ])
+
+    #     drift = self.continuous_f(action)(0, state) * dt
+    #     diffusion = (sigma_x @ np.random.normal(loc=0, scale=1, size=(2,1)) * np.sqrt(dt))[:, 0]
+    #     return state + (drift + diffusion)
 
     def f(self, state, action):
         """
-            True, discretized dynamics of the system. Pushes forward from (t) to (t + dt) using a constant action.
-    
-            INPUTS:
-                state - State array.
-                action - Action array.
-
-            OUTPUTS:
-                State array vector pushed forward in time.
+        Compute the next state given the current state and action.
+        Separates the deterministic and stochastic parts of the state transition.
+        
+        Args:
+            state (numpy.ndarray): Current state of the system.
+            action (numpy.ndarray): Action to be applied.
+        
+        Returns:
+            tuple: A tuple containing:
+                - numpy.ndarray: The deterministic part of the state change.
+                - numpy.ndarray: The stochastic part of the state change.
         """
+        # Deterministic part
+        x, y = state
+        b_x = np.array([
+            [4*x - 4*(x**3)],
+            [-2*y]
+        ])
+        deterministic_part = b_x + action
 
+        # Stochastic part
         sigma_x = np.array([
-            [0.7, state[0]],
+            [0.7, x],
             [0, 0.5]
         ])
-        # sigma_x = np.array([
-        #     [0.7, 0],
-        #     [0, 0.5]
-        # ])
-        # sigma_x = np.array([
-        #     [0, 0],
-        #     [0, 0]
-        # ])
+        stochastic_part = sigma_x @ self.np_random.normal(loc=0, scale=1, size=(2,1))
 
-        drift = self.continuous_f(action)(0, state) * dt
-        diffusion = (sigma_x @ np.random.normal(loc=0, scale=1, size=(2,1)) * np.sqrt(dt))[:, 0]
-        return state + (drift + diffusion)
+        return deterministic_part.flatten(), stochastic_part.flatten()
 
     def step(self, action):
-        # Compute reward of system
-        reward = self.reward_fn(self.state, action)
-
-        # Update state
-        self.state = self.f(self.state, action)
-        self.states.append(self.state)
-        self.potentials.append(self.potential())
-
-        # Update global step count
+        """
+        Take a step in the environment given an action.
+        
+        Args:
+            action (numpy.ndarray): The action to take.
+        
+        Returns:
+            tuple: A tuple containing:
+                - numpy.ndarray: The new state of the system.
+                - float: The reward for taking the action.
+                - bool: Whether the episode has terminated.
+                - dict: Additional information (empty in this case).
+        """
+        deterministic_part, stochastic_part = self.f(self.state, action)
+        
+        # Update state using Euler-Maruyama method
+        self.state = self.state + self.dt * deterministic_part + np.sqrt(self.dt) * stochastic_part
+        
+        # Clip state to be within bounds
+        self.state = np.clip(self.state, self.state_minimums, self.state_maximums)
+        
+        # Compute reward (negative cost)
+        reward = -self.cost_fn(self.state, action)
+        
+        # Update step count
         self.step_count += 1
+        
+        # Check if episode is done
+        done = self.step_count >= self.max_episode_steps
+        
+        # Store the current state
+        self.states.append(self.state)
+        
+        return self.state, reward, done, {}
 
-        # An episode is done if the system has run for max_episode_steps
-        terminated = self.step_count >= max_episode_steps
+    # def step(self, action):
+    #     # Compute reward of system
+    #     reward = self.reward_fn(self.state, action)
 
-        # return self.state, reward, terminated, False, {}
-        return self.state, reward, terminated, {}
+    #     # Update state
+    #     self.state = self.f(self.state, action)
+    #     self.states.append(self.state)
+    #     self.potentials.append(self.potential())
+
+    #     # Update global step count
+    #     self.step_count += 1
+
+    #     # An episode is done if the system has run for max_episode_steps
+    #     terminated = self.step_count >= max_episode_steps
+
+    #     # return self.state, reward, terminated, False, {}
+    #     return self.state, reward, terminated, {}

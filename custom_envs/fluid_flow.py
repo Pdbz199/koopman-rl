@@ -4,6 +4,8 @@ import numpy as np
 import torch
 
 from gym import spaces
+# import seed tooling from gym
+from gym.utils import seeding
 from gym.envs.registration import register
 from scipy.integrate import solve_ivp
 
@@ -79,35 +81,64 @@ class FluidFlow(gym.Env):
 
         # History of states traversed during the current episode
         self.states = []
+        self.np_random = None
 
-    def reset(self, state=None, seed=None, options={}):
-        # We need the following line to seed self.np_random
+    def seed(self, seed=None):
+        self.np_random, seed = seeding.np_random(seed)
+        return [seed]
+
+    def reset(self, seed=None, options={}):
         super().reset(seed=seed)
+        if self.np_random is None or seed is not None:
+            self.seed(seed)
 
-        # Choose the initial state uniformly at random
-        if state is None:
-            # self.state = self.observation_space.sample()
-            self.state = np.random.uniform(
-                low=self.state_minimums,
-                high=self.state_maximums,
-                size=(self.state_dim,),
-            )
-        else:
-            self.state = state
+        self.state = self.np_random.uniform(
+            low=self.state_minimums,
+            high=self.state_maximums,
+            size=(self.state_dim,),
+        )
         self.states = [self.state]
-
-        # Track number of steps taken
         self.step_count = 0
 
-        # return self.state, {}
         return self.state
+
+    # def reset(self, state=None, seed=None, options={}):
+    #     # We need the following line to seed self.np_random
+    #     super().reset(seed=seed)
+
+    #     # Choose the initial state uniformly at random
+    #     if state is None:
+    #         # self.state = self.observation_space.sample()
+    #         self.state = np.random.uniform(
+    #             low=self.state_minimums,
+    #             high=self.state_maximums,
+    #             size=(self.state_dim,),
+    #         )
+    #     else:
+    #         self.state = state
+    #     self.states = [self.state]
+
+    #     # Track number of steps taken
+    #     self.step_count = 0
+
+    #     # return self.state, {}
+    #     return self.state
 
     def cost_fn(self, state, action):
         _state = state - self.reference_point
-
+        # Ensure _state is a 1D array
+        _state = np.atleast_1d(_state).flatten()
+        
+        # Ensure action is a 1D array
+        action = np.atleast_1d(action).flatten()
+        # Diagnostic print statements
+        # print("_state shape:", _state.shape)
+        # print("action shape:", action.shape)
+        # print("self.Q shape:", self.Q.shape)
+        # print("self.R shape:", self.R.shape)
         cost = _state @ self.Q @ _state.T + action @ self.R @ action.T
 
-        return cost
+        return cost #! can return float(cost to ensure a scalar is returned)
 
     def reward_fn(self, state, action):
         return -self.cost_fn(state, action)
@@ -142,11 +173,11 @@ class FluidFlow(gym.Env):
             y_dot = self.omega*x + self.mu*y + self.A*y*z
             z_dot = -self.lamb * ( z - np.power(x, 2) - np.power(y, 2) )
 
-            u = action
+            u = action if np.isscalar(action) else action[0]
             if u is None:
                 u = np.zeros(self.action_dim)
 
-            return [ x_dot, y_dot + u[0], z_dot ]
+            return [ x_dot, y_dot + u, z_dot ]
 
         return f_u
 
@@ -167,6 +198,8 @@ class FluidFlow(gym.Env):
         return soln.y[:, -1]
 
     def step(self, action):
+        # Ensure action is a scalar
+        action = action[0] if isinstance(action, (list, np.ndarray)) else action
         # Compute reward of system
         reward = self.reward_fn(self.state, action)
 
