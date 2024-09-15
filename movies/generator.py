@@ -10,78 +10,71 @@ class Generator:
         torch.manual_seed(self.seed)
 
         self.envs = envs
-        self.is_double_well = args.env_id == 'DoubleWell-v0'
+        self.env_id = args.env_id
+        self.is_stochastic = 'DoubleWell' in self.env_id
         self.policy = policy
 
-    def generate_trajectories(self, num_trajectories, num_steps_per_trajectory=None):
+    def generate_trajectories(self, num_trajectories, num_steps_per_trajectory=None, shared_brownian_shocks=None):
         print(f"Generating {num_trajectories} {'trajectory' if num_trajectories == 1 else 'trajectories'}...")
 
-        # Store trajectories in an array
         trajectories = []
-        action = [[0]]
         costs = []
+        potentials = [] if self.is_stochastic else None
+        brownian_shocks = [] if self.is_stochastic else None
 
-        # Loop through number of trajectories
         for trajectory_num in range(num_trajectories):
-            # Create new trajectory and reset environment
             trajectory = []
             costs_per_trajectory = []
+            potentials_per_trajectory = [] if self.is_stochastic else None
+            brownian_shocks_per_trajectory = [] if self.is_stochastic else None
+
             state = self.envs.reset()
-            cost = self.envs.envs[0].cost_fn(state, np.array([0]))[0,0]
-            if self.is_double_well:
+            action = np.zeros(self.envs.action_space.shape)
+            cost = self.envs.envs[0].cost_fn(state, action)
+            if self.is_stochastic:
                 potential = self.envs.envs[0].potential()
-            dones = [False]
 
-            # Set up our loop condition
-            # Using a function so the boolean value is not hardcoded and can be recomputed
             step_num = 0
-            def check_loop_condition():
-                if num_steps_per_trajectory is not None:
-                    return step_num < num_steps_per_trajectory
-                else:
-                    if step_num >= self.envs.envs[0].max_episode_steps:
-                        return True
+            done = False
 
-                    for done in dones:
-                        if done is True:
-                            return True
-                    return False
+            while not done:
+                if self.is_stochastic and shared_brownian_shocks is not None:
+                    current_shock = shared_brownian_shocks[trajectory_num][step_num]
+                    brownian_shocks_per_trajectory.append(current_shock)
+                    self.envs.envs[0].set_brownian_shock(current_shock)
 
-            # Loop through trajectory until condition is met
-            while check_loop_condition() is False:
-                # Get action from generic policy and get new state
                 action = self.policy.get_action(state)
-                new_state, reward, dones, _ = self.envs.step(action)
+                new_state, reward, done, _ = self.envs.step(action)
 
-                # Print progress
                 if step_num % 100 == 0:
                     print(f"Finished generating step {step_num}")
 
-                # Update state
                 state = new_state
                 cost = -reward[0]
-                if self.is_double_well:
-                    potential = self.envs.envs[0].potential(U=action[0][0])
-                step_num += 1
-
-                # Append new state to trajectory
-                if self.is_double_well:
-                    trajectory.append(
-                        np.concatenate((state[0], action[0], [potential]))
-                    )
-                else:
-                    trajectory.append(state[0])
+                
+                trajectory.append(state[0])
                 costs_per_trajectory.append(cost)
+                
+                if self.is_stochastic:
+                    potential = self.envs.envs[0].potential(U=action[0][0])
+                    potentials_per_trajectory.append(potential)
 
-            # Append trajectory to list of trajectories
+                step_num += 1
+                if num_steps_per_trajectory is not None and step_num >= num_steps_per_trajectory:
+                    break
+
             trajectories.append(trajectory)
             costs.append(costs_per_trajectory)
+            if self.is_stochastic:
+                potentials.append(potentials_per_trajectory)
+                brownian_shocks.append(brownian_shocks_per_trajectory)
 
-        # Cast trajectories into numpy array
         trajectories = np.array(trajectories)
         costs = np.array(costs)
+        if self.is_stochastic:
+            potentials = np.array(potentials)
+            brownian_shocks = np.array(brownian_shocks)
 
-        # Print success message
         print(f"Finished generating {num_trajectories} {'trajectory' if num_trajectories == 1 else 'trajectories'}!")
 
-        return trajectories, costs
+        return trajectories, costs, potentials, brownian_shocks
